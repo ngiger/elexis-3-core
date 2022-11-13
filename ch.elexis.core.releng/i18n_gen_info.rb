@@ -127,10 +127,6 @@ class GoogleTranslation
     key = [what, target_language, source_language]
     value = @@translationCache.find{|x, y| x[0].eql?(what) && x[1].eql?(target_language) && x[2].eql?(source_language) }
     unless value
-      unless ENV['TRANSLATE_API_KEY']
-        puts "MISSING TRANSLATE_API_KEY #{key} #{key.first.encoding}"
-        exit(3)
-      end
       begin
         value = Translate.list_translations(what, target_language, source: source_language)
         @@translationCache[key] = value.translations.collect{|x| x.translated_text}
@@ -516,13 +512,18 @@ class I18nInfo
     CGI.unescapeHTML(translated)
   end
 
-  def add_csv_to_db_texts
-    puts "Adding missing entries for #{File.basename(DB_NAME)}"
+  def add_missing # aka add_csv_to_db_texts
+    unless ENV['TRANSLATE_API_KEY']
+      puts "Without an enviornment variable TRANSLATE_API_KEY we cannot translate any new string"
+      exit(3)
+    end
     inserts = {}
     idx = 0
 	size = L10N_Cache.keys.size
+    puts "Adding missing entries for #{File.expand_path(DB_NAME)} checking #{size} keys"
     L10N_Cache.keys.each do |key|
-	   entry = L10N_Cache.db_get_entry(key)
+      puts "Checking #{idx} #{key}" if $VERBOSE
+      entry = L10N_Cache.db_get_entry(key)
       idx += 1
       puts "#{Time.now}: Analysing message #{idx} of #{size}" if idx % 500 == 0
 	  binding.pry unless key.eql?(key.encode('utf-8'))
@@ -550,9 +551,6 @@ class I18nInfo
       end
     end
     puts "Inserted #{inserts.size} missing entries of #{size}"
-  end
-  def add_missing
-    add_csv_to_db_texts
   end
 
   def to_db(dir)
